@@ -1,48 +1,28 @@
 # Snippets Pro
 
-**3 snippets** across **3 languages** - last updated **2026-10-08**.
+**3 snippets** across **3 categories** and **3 languages** - last updated **2026-10-08**.
 
 ## Table of contents
 
-- **JavaScript** (1)
-  - [Debounce (browser)](#debounce-browser)
-- **PowerShell** (1)
-  - [Find the largest files](#find-the-largest-files)
-- **Python** (1)
-  - [Retry decorator with backoff](#retry-decorator-with-backoff)
+- **[Filesystem](#filesystem)** (1)
+  - [PowerShell](#powershell) (1)
+    - [Find the largest files](#find-the-largest-files)
+- **[Networking](#networking)** (1)
+  - [Python](#python) (1)
+    - [Retry decorator with backoff](#retry-decorator-with-backoff)
+- **[Web UI](#web-ui)** (1)
+  - [JavaScript](#javascript) (1)
+    - [Debounce (browser)](#debounce-browser)
 
-## JavaScript
+## Filesystem
 
-### Debounce (browser)
+### PowerShell
 
-Delay a function call until the user stops firing events.
-
-`#utils` `#browser` `#performance` · updated 2026-10-08 · 14 lines
-
-```javascript
-/** Run `fn` only after `wait` ms of silence - handy for resize/scroll/input handlers. */
-export function debounce(fn, wait = 300) {
-  let timer = null;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), wait);
-  };
-}
-
-const onResize = debounce(() => {
-  console.log(window.innerWidth);
-}, 150);
-
-window.addEventListener("resize", onResize);
-```
-
-## PowerShell
-
-### Find the largest files
+#### Find the largest files
 
 List the biggest files below a folder on Windows.
 
-`#filesystem` `#windows` · updated 2026-10-08 · 10 lines
+[`#filesystem`](#filesystem-1) [`#windows`](#windows) · updated 2026-10-08 · 10 lines
 
 ```powershell
 # List the biggest files below a folder (Windows / PowerShell)
@@ -57,13 +37,15 @@ Get-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue |
         @{ Name = "MB"; Expression = { [math]::Round($_.Length / 1MB, 2) } }
 ```
 
-## Python
+## Networking
 
-### Retry decorator with backoff
+### Python
+
+#### Retry decorator with backoff
 
 Updated description from the CLI.
 
-`#http` `#retry` `#resilience` `#backoff` · updated 2026-10-08 · 26 lines
+[`#http`](#http) [`#retry`](#retry) [`#resilience`](#resilience) [`#backoff`](#backoff) · updated 2026-10-08 · 26 lines
 
 ```python
 """Retry a flaky callable with exponential backoff."""
@@ -94,18 +76,86 @@ def fetch(url):
     return url
 ```
 
+## Web UI
+
+### JavaScript
+
+#### Debounce (browser)
+
+Delay a function call until the user stops firing events.
+
+[`#utils`](#utils) [`#browser`](#browser) [`#performance`](#performance) · updated 2026-10-08 · 14 lines
+
+```javascript
+/** Run `fn` only after `wait` ms of silence - handy for resize/scroll/input handlers. */
+export function debounce(fn, wait = 300) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), wait);
+  };
+}
+
+const onResize = debounce(() => {
+  console.log(window.innerWidth);
+}, 150);
+
+window.addEventListener("resize", onResize);
+```
+
+## Browse by tag
+
+### #backoff
+
+- [Retry decorator with backoff](#retry-decorator-with-backoff)
+
+### #browser
+
+- [Debounce (browser)](#debounce-browser)
+
+### #filesystem
+
+- [Find the largest files](#find-the-largest-files)
+
+### #http
+
+- [Retry decorator with backoff](#retry-decorator-with-backoff)
+
+### #performance
+
+- [Debounce (browser)](#debounce-browser)
+
+### #resilience
+
+- [Retry decorator with backoff](#retry-decorator-with-backoff)
+
+### #retry
+
+- [Retry decorator with backoff](#retry-decorator-with-backoff)
+
+### #utils
+
+- [Debounce (browser)](#debounce-browser)
+
+### #windows
+
+- [Find the largest files](#find-the-largest-files)
+
 ## Usage
 
 ```bash
-python snippet_cli.py add                      # add a snippet (opens your editor)
-python snippet_cli.py search "http retry"      # full-text search
-python snippet_cli.py list                     # compact overview
-python snippet_cli.py show 3 --code-only       # print just the code
-python snippet_cli.py copy 3                   # copy the code to the clipboard
-python snippet_cli.py edit 3                   # change metadata and/or code
-python snippet_cli.py delete 3                 # remove it again
-python snippet_cli.py build                    # regenerate this README
-python snippet_cli.py sync                     # git add / commit / push
+python snippet_cli.py add                           # add a snippet (opens your editor)
+python snippet_cli.py search "http retry"           # full-text search (title, description, tags, code)
+python snippet_cli.py list                          # compact overview
+python snippet_cli.py list --category Web            # everything inside one category
+python snippet_cli.py list --tag http,retry          # snippets carrying ALL given tags
+python snippet_cli.py tags                           # your tag vocabulary + usage counts
+python snippet_cli.py show 3 --code-only             # print just the code
+python snippet_cli.py copy 3                         # copy the code to the clipboard
+python snippet_cli.py edit 3                         # change category/language/tags/code
+python snippet_cli.py delete 3                       # remove it again
+python snippet_cli.py build                          # regenerate this README
+python snippet_cli.py sync                           # git add / commit / push
 ```
 
 ---

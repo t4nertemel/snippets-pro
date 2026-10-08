@@ -26,6 +26,7 @@ beyond having Python 3.8+ available.
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -45,8 +46,9 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "snippets.json"
 README_PATH = BASE_DIR / "README.md"
 
-DB_SCHEMA = 1
+DB_SCHEMA = 2  # 2 = snippets gained a "category" field (top-level grouping)
 README_TITLE = "Snippets"
+DEFAULT_CATEGORY = "Uncategorised"
 
 # Canonical language slugs (left side) mapped from common aliases (right side).
 LANGUAGE_ALIASES = {
@@ -278,6 +280,17 @@ def normalize_language(raw: str) -> str:
     return re.sub(r"[^a-z0-9+#]+", "", value) or "text"
 
 
+def normalize_category(raw) -> str:
+    """Topic bucket such as "Web" or "DevOps"; blank means DEFAULT_CATEGORY."""
+    value = " ".join(str(raw or "").split())  # collapse repeated whitespace
+    return value or DEFAULT_CATEGORY
+
+
+def category_key(value) -> str:
+    """Case-insensitive grouping key for a category."""
+    return normalize_category(value).lower()
+
+
 def language_name(slug: str) -> str:
     return LANGUAGE_NAMES.get(slug, slug.capitalize())
 
@@ -319,6 +332,7 @@ def ensure_snippet_shape(raw: dict, fallback_id: int) -> dict:
     snippet = {
         "id": int(raw.get("id") or fallback_id),
         "title": title,
+        "category": normalize_category(raw.get("category")),
         "language": normalize_language(str(raw.get("language") or "text")),
         "description": str(raw.get("description") or "").strip(),
         "tags": parse_tags(raw.get("tags")),
@@ -580,10 +594,30 @@ def format_tags(tags) -> str:
     return " ".join(f"#{tag}" for tag in tags)
 
 
+def tag_vocabulary(db: dict) -> set:
+    """Every tag already in use."""
+    return {tag for snippet in db["snippets"] for tag in snippet["tags"]}
+
+
+def warn_about_new_tags(db: dict, tags) -> None:
+    """Nudge towards a controlled vocabulary when a new tag looks like a typo."""
+    known = tag_vocabulary(db)
+    for tag in tags:
+        if tag in known:
+            continue
+        close = difflib.get_close_matches(tag, sorted(known), n=3, cutoff=0.75)
+        if close:
+            warn(f"new tag '{tag}' - did you mean: {', '.join(close)}?")
+
+
 def print_snippet(snippet: dict, show_code: bool = True) -> None:
     print()
     print(f"{bold(str(snippet['id']))} {bold(snippet['title'])}")
-    details = [cyan(language_name(snippet["language"])), f"slug: {snippet['slug']}"]
+    details = [
+        cyan(snippet["category"]),
+        cyan(language_name(snippet["language"])),
+        f"slug: {snippet['slug']}",
+    ]
     print("  " + dim(" · ".join(details)))
     if snippet["description"]:
         print(f"  {snippet['description']}")
@@ -599,24 +633,30 @@ def print_snippet(snippet: dict, show_code: bool = True) -> None:
 
 
 def build_summary_rows(snippets) -> list:
-    """(id, title, language, tags, updated) rows, title-sorted per language."""
+    """(id, title, category, language, tags, updated) rows."""
     return [
         (
             snippet["id"],
             snippet["title"],
+            snippet["category"],
             language_name(snippet["language"]),
             format_tags(snippet["tags"]),
             snippet["updated"][:10],
         )
-        for snippet in sorted(snippets, key=lambda s: (s["language"], s["title"].lower()))
+        for snippet in sorted(
+            snippets,
+            key=lambda s: (s["category"].lower(), s["language"], s["title"].lower()),
+        )
     ]
 
 
-def print_table(rows) -> None:
+DEFAULT_TABLE_HEADERS = ("ID", "TITLE", "CATEGORY", "LANGUAGE", "TAGS", "UPDATED")
+
+
+def print_table(rows, headers=DEFAULT_TABLE_HEADERS) -> None:
     if not rows:
         print(dim("  (nothing to show)"))
         return
-    headers = ("ID", "TITLE", "LANGUAGE", "TAGS", "UPDATED")
     widths = [len(header) for header in headers]
     for row in rows:
         for index, cell in enumerate(row):
@@ -655,11 +695,16 @@ def cmd_add(args) -> int:
     if non_interactive:
         code = read_code_source(args)
         title = args.title or (source_path.stem if source_path else "Stdin snippet")
+        category = normalize_category(args.category)
         language = normalize_language(args.language or guess_language(source_path) or "text")
         description = args.description or ""
         tags = parse_tags(args.tags)
     else:
         title = args.title or prompt("Title", required=True)
+        if args.category is not None:
+            category = normalize_category(args.category)
+        else:
+            category = normalize_category(prompt(f"Category (optional) [{DEFAULT_CATEGORY}]"))
         language = normalize_language(args.language) if args.language else pick_language("text")
         description = args.description if args.description is not None else prompt("Description (optional)")
         tags = parse_tags(args.tags if args.tags is not None else prompt("Tags (comma separated, optional)"))
@@ -669,11 +714,14 @@ def cmd_add(args) -> int:
     if not code.strip():
         fail("The snippet is empty - nothing was saved.")
 
+    warn_about_new_tags(db, tags)
+
     stamp = now_iso()
     snippet = {
         "id": next_id(db),
         "slug": unique_slug(db, title),
         "title": title,
+        "category": category,
         "language": language,
         "description": description,
         "tags": tags,
@@ -695,8 +743,11 @@ def cmd_add(args) -> int:
 # --------------------------------------------------------------------------
 
 
-def filter_snippets(snippets, language=None, tag=None) -> list:
+def filter_snippets(snippets, language=None, tag=None, category=None) -> list:
     result = list(snippets)
+    if category:
+        wanted_category = category_key(category)
+        result = [s for s in result if category_key(s["category"]) == wanted_category]
     if language:
         wanted_languages = {normalize_language(language)}
         result = [s for s in result if s["language"] in wanted_languages]
@@ -711,6 +762,7 @@ def snippet_haystack(snippet: dict) -> str:
         [
             snippet["title"],
             snippet["slug"],
+            snippet["category"],
             snippet["language"],
             language_name(snippet["language"]),
             snippet["description"],
@@ -722,7 +774,9 @@ def snippet_haystack(snippet: dict) -> str:
 
 def cmd_list(args) -> int:
     db = load_db()
-    snippets = filter_snippets(db["snippets"], language=args.language, tag=args.tag)
+    snippets = filter_snippets(
+        db["snippets"], language=args.language, tag=args.tag, category=args.category
+    )
     if args.json:
         print(json.dumps(snippets, indent=2, ensure_ascii=False))
         return 0
@@ -731,7 +785,7 @@ def cmd_list(args) -> int:
     print(bold(f"{len(snippets)} snippet(s)"))
     print_table(build_summary_rows(snippets))
     print()
-    print(dim("  read one with: python snippet_cli.py show <id|slug>"))
+    print(dim("  show one: python snippet_cli.py show <id|slug>   |   narrow down with --category / --tag / --language"))
     return 0
 
 
@@ -741,7 +795,9 @@ def cmd_search(args) -> int:
     if not terms:
         fail("Give at least one search term.")
 
-    candidates = filter_snippets(db["snippets"], language=args.language, tag=args.tag)
+    candidates = filter_snippets(
+        db["snippets"], language=args.language, tag=args.tag, category=args.category
+    )
     matches = [
         snippet
         for snippet in candidates
@@ -791,19 +847,24 @@ def cmd_edit(args) -> int:
     snippet = resolve_snippet(db, args.ref)
 
     has_field_flag = any(
-        value is not None for value in (args.title, args.language, args.description, args.tags)
+        value is not None
+        for value in (args.title, args.category, args.language, args.description, args.tags)
     )
     has_code_flag = bool(args.file or args.stdin)
     non_interactive = has_field_flag or has_code_flag
 
     if non_interactive:
         new_title = args.title if args.title is not None else snippet["title"]
+        new_category = (
+            normalize_category(args.category) if args.category is not None else snippet["category"]
+        )
         new_language = normalize_language(args.language) if args.language else snippet["language"]
         new_description = args.description if args.description is not None else snippet["description"]
         new_tags = parse_tags(args.tags) if args.tags is not None else snippet["tags"]
         code = read_code_source(args) if has_code_flag else snippet["code"]
     else:
         new_title = prompt("Title", default=snippet["title"], required=True)
+        new_category = normalize_category(prompt("Category", default=snippet["category"]))
         print(dim(f"  current language: {language_name(snippet['language'])}"))
         new_language = pick_language(snippet["language"])
         new_description = prompt("Description", default=snippet["description"])
@@ -818,6 +879,8 @@ def cmd_edit(args) -> int:
     if new_title != snippet["title"]:
         changes["title"] = new_title
         changes["slug"] = unique_slug(db, new_title, keep_id=snippet["id"])
+    if new_category != snippet["category"]:
+        changes["category"] = new_category
     if new_language != snippet["language"]:
         changes["language"] = new_language
     if new_description != snippet["description"]:
@@ -891,6 +954,38 @@ def cmd_copy(args) -> int:
 
 
 # --------------------------------------------------------------------------
+# Command: tags
+# --------------------------------------------------------------------------
+
+
+def cmd_tags(args) -> int:
+    """Show the tag vocabulary and how often each tag is used."""
+    db = load_db()
+    snippets = filter_snippets(db["snippets"], category=args.category)
+
+    counts = {}
+    for snippet in snippets:
+        for tag in snippet["tags"]:
+            counts[tag] = counts.get(tag, 0) + 1
+
+    if args.json:
+        print(json.dumps(counts, indent=2, ensure_ascii=False))
+        return 0
+
+    if not counts:
+        warn("No tags yet - add some with: python snippet_cli.py add --tags http,retry")
+        return 0
+
+    ordered = sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))
+    print()
+    print(bold(f"{len(ordered)} tag(s) across {len(snippets)} snippet(s)"))
+    print_table([(f"#{tag}", count) for tag, count in ordered], headers=("TAG", "SNIPPETS"))
+    print()
+    print(dim("  see everything behind a tag with: python snippet_cli.py list --tag <name>"))
+    return 0
+
+
+# --------------------------------------------------------------------------
 # README generation
 # --------------------------------------------------------------------------
 
@@ -915,28 +1010,46 @@ def github_anchor(text: str) -> str:
     return text.replace(" ", "-")
 
 
-def group_by_language(snippets) -> list:
-    """[(language_slug, display_name, [titles-sorted snippets]), ...]"""
-    groups = {}
+def group_snippets(snippets) -> list:
+    """[category tuple] -> (category_key, category_display, [(language_slug, language_display, [snippets]), ...])"""
+    categories = {}
     for snippet in snippets:
-        groups.setdefault(snippet["language"], []).append(snippet)
-    return [
-        (slug, language_name(slug), sorted(items, key=lambda s: s["title"].lower()))
-        for slug, items in sorted(groups.items(), key=lambda pair: language_name(pair[0]).lower())
-    ]
+        bucket = categories.setdefault(
+            category_key(snippet["category"]),
+            {"display": normalize_category(snippet["category"]), "languages": {}},
+        )
+        bucket["languages"].setdefault(snippet["language"], []).append(snippet)
+
+    def order(item):
+        bucket = item[1]
+        return (bucket["display"] == DEFAULT_CATEGORY, bucket["display"].lower())
+
+    groups = []
+    for key, bucket in sorted(categories.items(), key=order):
+        languages = [
+            (slug, language_name(slug), sorted(items, key=lambda s: s["title"].lower()))
+            for slug, items in sorted(
+                bucket["languages"].items(), key=lambda pair: language_name(pair[0]).lower()
+            )
+        ]
+        groups.append((key, bucket["display"], languages))
+    return groups
 
 
 USAGE_BLOCK = [
     "```bash",
-    "python snippet_cli.py add                      # add a snippet (opens your editor)",
-    'python snippet_cli.py search "http retry"      # full-text search',
-    "python snippet_cli.py list                     # compact overview",
-    "python snippet_cli.py show 3 --code-only       # print just the code",
-    "python snippet_cli.py copy 3                   # copy the code to the clipboard",
-    "python snippet_cli.py edit 3                   # change metadata and/or code",
-    "python snippet_cli.py delete 3                 # remove it again",
-    "python snippet_cli.py build                    # regenerate this README",
-    "python snippet_cli.py sync                     # git add / commit / push",
+    "python snippet_cli.py add                           # add a snippet (opens your editor)",
+    'python snippet_cli.py search "http retry"           # full-text search (title, description, tags, code)',
+    "python snippet_cli.py list                          # compact overview",
+    "python snippet_cli.py list --category Web            # everything inside one category",
+    "python snippet_cli.py list --tag http,retry          # snippets carrying ALL given tags",
+    "python snippet_cli.py tags                           # your tag vocabulary + usage counts",
+    "python snippet_cli.py show 3 --code-only             # print just the code",
+    "python snippet_cli.py copy 3                         # copy the code to the clipboard",
+    "python snippet_cli.py edit 3                         # change category/language/tags/code",
+    "python snippet_cli.py delete 3                       # remove it again",
+    "python snippet_cli.py build                          # regenerate this README",
+    "python snippet_cli.py sync                           # git add / commit / push",
     "```",
 ]
 
@@ -944,21 +1057,45 @@ USAGE_BLOCK = [
 def build_readme(db: dict, title: str = README_TITLE) -> str:
     """Render the whole README as a single Markdown string."""
     snippets = db["snippets"]
-    groups = group_by_language(snippets)
+    groups = group_snippets(snippets)
 
+    # Cross-cutting tag index (tag -> snippets), busiest tags first.
+    tag_index = {}
+    for snippet in snippets:
+        for tag in snippet["tags"]:
+            tag_index.setdefault(tag, []).append(snippet)
+    ordered_tags = sorted(tag_index, key=lambda tag: (-len(tag_index[tag]), tag))
+
+    # Anchors must be registered in document order so they always stay unique.
     registry = AnchorRegistry()
-    entries = []  # (language_slug, display_name, snippet, anchor)
-    for slug, display_name, items in groups:
-        for snippet in items:
-            entries.append((slug, display_name, snippet, registry.register(snippet["title"])))
+    registry.register("Table of contents")
+    title_anchors = {}
+    sections = []
+    for key, display, languages in groups:
+        category_anchor = registry.register(display)
+        language_groups = []
+        for slug, language_display, items in languages:
+            language_anchor = registry.register(language_display)
+            entries = []
+            for snippet in items:
+                anchor = registry.register(snippet["title"])
+                title_anchors[snippet["id"]] = anchor
+                entries.append((snippet, anchor))
+            language_groups.append((slug, language_display, language_anchor, entries))
+        sections.append((key, display, category_anchor, language_groups))
+
+    registry.register("Browse by tag")
+    tag_anchors = {tag: registry.register(f"#{tag}") for tag in ordered_tags}
+    registry.register("Usage")
 
     lines = [f"# {title}", ""]
     if snippets:
-        languages = len(groups)
-        plural = "s" if languages != 1 else ""
+        categories = len(sections)
+        languages = len({snippet["language"] for snippet in snippets})
         lines.append(
-            f"**{len(snippets)} snippet{'s' if len(snippets) != 1 else ''}** "
-            f"across **{languages} language{plural}** - "
+            f"**{len(snippets)} snippet{'s' if len(snippets) != 1 else ''}** across "
+            f"**{categories} categor{'ies' if categories != 1 else 'y'}** and "
+            f"**{languages} language{'s' if languages != 1 else ''}** - "
             f"last updated **{(db.get('updated') or today())[:10]}**."
         )
     else:
@@ -968,35 +1105,51 @@ def build_readme(db: dict, title: str = README_TITLE) -> str:
     if snippets:
         lines.append("## Table of contents")
         lines.append("")
-        current_language = None
-        for slug, display_name, snippet, anchor in entries:
-            if slug != current_language:
-                current_language = slug
-                count = sum(1 for entry in entries if entry[0] == slug)
-                lines.append(f"- **{display_name}** ({count})")
-            lines.append(f"  - [{snippet['title']}](#{anchor})")
+        for key, display, category_anchor, language_groups in sections:
+            total = sum(len(entries) for _, _, _, entries in language_groups)
+            lines.append(f"- **[{display}](#{category_anchor})** ({total})")
+            for slug, language_display, language_anchor, entries in language_groups:
+                lines.append(f"  - [{language_display}](#{language_anchor}) ({len(entries)})")
+                for snippet, anchor in entries:
+                    lines.append(f"    - [{snippet['title']}](#{anchor})")
         lines.append("")
 
-        for slug, display_name, items in groups:
-            lines.append(f"## {display_name}")
+        for key, display, category_anchor, language_groups in sections:
+            lines.append(f"## {display}")
             lines.append("")
-            for snippet in items:
-                lines.append(f"### {snippet['title']}")
+            for slug, language_display, language_anchor, entries in language_groups:
+                lines.append(f"### {language_display}")
                 lines.append("")
-                if snippet["description"]:
-                    lines.append(snippet["description"])
+                for snippet, anchor in entries:
+                    lines.append(f"#### {snippet['title']}")
                     lines.append("")
-                meta = []
-                if snippet["tags"]:
-                    meta.append(" ".join(f"`#{tag}`" for tag in snippet["tags"]))
-                meta.append(f"updated {snippet['updated'][:10]}")
-                meta.append(f"{len(snippet['code'].splitlines())} lines")
-                lines.append(" · ".join(meta))
+                    if snippet["description"]:
+                        lines.append(snippet["description"])
+                        lines.append("")
+                    meta = []
+                    if snippet["tags"]:
+                        meta.append(
+                            " ".join(f"[`#{tag}`](#{tag_anchors[tag]})" for tag in snippet["tags"])
+                        )
+                    meta.append(f"updated {snippet['updated'][:10]}")
+                    meta.append(f"{len(snippet['code'].splitlines())} lines")
+                    lines.append(" · ".join(meta))
+                    lines.append("")
+                    fence = fence_for(snippet["code"])
+                    lines.append(fence + fence_token(snippet["language"]))
+                    lines.append(snippet["code"])
+                    lines.append(fence)
+                    lines.append("")
+
+        if ordered_tags:
+            lines.append("## Browse by tag")
+            lines.append("")
+            for tag in ordered_tags:
+                matches = tag_index[tag]
+                lines.append(f"### #{tag}")
                 lines.append("")
-                fence = fence_for(snippet["code"])
-                lines.append(fence + fence_token(snippet["language"]))
-                lines.append(snippet["code"])
-                lines.append(fence)
+                for snippet in matches:
+                    lines.append(f"- [{snippet['title']}](#{title_anchors[snippet['id']]})")
                 lines.append("")
 
     lines.append("## Usage")
@@ -1110,7 +1263,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Manage a personal snippet repository (snippets.json -> README.md).",
         epilog=(
             "examples:\n"
-            "  python snippet_cli.py add --file utils.py --tags http,retry\n"
+            "  python snippet_cli.py add --file utils.py --category Web --tags http,retry\n"
+            "  python snippet_cli.py list --category Web\n"
+            "  python snippet_cli.py tags\n"
             "  python snippet_cli.py search retry --show\n"
             "  python snippet_cli.py show debounce --code-only\n"
             "  python snippet_cli.py sync -m \"add debounce helper\"\n"
@@ -1126,6 +1281,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     def add_metadata_arguments(subparser) -> None:
         subparser.add_argument("--title", help="snippet title")
+        subparser.add_argument("--category", help="topic bucket, e.g. Web, DevOps, Filesystem")
         subparser.add_argument("--language", help="language, e.g. python, js, bash, c++")
         subparser.add_argument("--description", help="short description shown in the README")
         subparser.add_argument("--tags", help="comma separated tags, e.g. http,retry")
@@ -1137,6 +1293,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_parser.set_defaults(handler=cmd_add)
 
     list_parser = subparsers.add_parser("list", help="list stored snippets")
+    list_parser.add_argument("--category", help="only show this category")
     list_parser.add_argument("--language", help="only show this language")
     list_parser.add_argument("--tag", help="only show snippets carrying every given tag")
     list_parser.add_argument("--json", action="store_true", help="machine readable output")
@@ -1144,6 +1301,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     search_parser = subparsers.add_parser("search", help="full-text search across all snippets")
     search_parser.add_argument("terms", nargs="+", help="words that must all appear (code included)")
+    search_parser.add_argument("--category", help="restrict the search to one category")
     search_parser.add_argument("--language", help="restrict the search to one language")
     search_parser.add_argument("--tag", help="restrict the search to snippets with these tags")
     search_parser.add_argument("--show", action="store_true", help="print the code of every match")
@@ -1159,6 +1317,11 @@ def build_parser() -> argparse.ArgumentParser:
     copy_parser = subparsers.add_parser("copy", help="copy a snippet's code to the clipboard")
     copy_parser.add_argument("ref", help="id, slug or part of the title")
     copy_parser.set_defaults(handler=cmd_copy)
+
+    tags_parser = subparsers.add_parser("tags", help="list the tag vocabulary with usage counts")
+    tags_parser.add_argument("--category", help="only count tags used inside this category")
+    tags_parser.add_argument("--json", action="store_true", help="machine readable output")
+    tags_parser.set_defaults(handler=cmd_tags)
 
     edit_parser = subparsers.add_parser("edit", help="edit metadata and/or code")
     edit_parser.add_argument("ref", help="id, slug or part of the title")

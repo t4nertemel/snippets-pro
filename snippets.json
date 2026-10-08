@@ -1,11 +1,12 @@
 {
-  "schema": 1,
+  "schema": 2,
   "title": "Snippets Pro",
-  "updated": "2026-10-08T22:41:25+01:00",
+  "updated": "2026-10-08T22:47:44+01:00",
   "snippets": [
     {
       "id": 1,
       "title": "Retry decorator with backoff",
+      "category": "Networking",
       "language": "python",
       "description": "Updated description from the CLI.",
       "tags": [
@@ -16,12 +17,13 @@
       ],
       "code": "\"\"\"Retry a flaky callable with exponential backoff.\"\"\"\nimport functools\nimport time\n\n\ndef retry(attempts=3, delay=0.5, backoff=2.0, exceptions=(Exception,)):\n    \"\"\"Retry `function` until it stops raising, then give up.\"\"\"\n    def decorator(function):\n        @functools.wraps(function)\n        def wrapper(*args, **kwargs):\n            wait = delay\n            for attempt in range(1, attempts + 1):\n                try:\n                    return function(*args, **kwargs)\n                except exceptions:\n                    if attempt == attempts:\n                        raise\n                    time.sleep(wait)\n                    wait *= backoff\n        return wrapper\n    return decorator\n\n\n@retry(attempts=5, delay=0.2)\ndef fetch(url):\n    return url",
       "created": "2026-10-08T22:15:09+01:00",
-      "updated": "2026-10-08T22:16:38+01:00",
+      "updated": "2026-10-08T22:47:09+01:00",
       "slug": "retry-decorator-with-backoff"
     },
     {
       "id": 2,
       "title": "Debounce (browser)",
+      "category": "Web UI",
       "language": "javascript",
       "description": "Delay a function call until the user stops firing events.",
       "tags": [
@@ -31,12 +33,13 @@
       ],
       "code": "/** Run `fn` only after `wait` ms of silence - handy for resize/scroll/input handlers. */\nexport function debounce(fn, wait = 300) {\n  let timer = null;\n  return (...args) => {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn(...args), wait);\n  };\n}\n\nconst onResize = debounce(() => {\n  console.log(window.innerWidth);\n}, 150);\n\nwindow.addEventListener(\"resize\", onResize);",
       "created": "2026-10-08T22:15:09+01:00",
-      "updated": "2026-10-08T22:16:38+01:00",
+      "updated": "2026-10-08T22:47:09+01:00",
       "slug": "debounce-browser"
     },
     {
       "id": 3,
       "title": "Find the largest files",
+      "category": "Filesystem",
       "language": "powershell",
       "description": "List the biggest files below a folder on Windows.",
       "tags": [
@@ -45,7 +48,7 @@
       ],
       "code": "# List the biggest files below a folder (Windows / PowerShell)\nparam(\n    [string]$Path = \"C:\\Users\",\n    [int]$Top = 20\n)\n\nGet-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue |\n    Sort-Object -Property Length -Descending |\n    Select-Object -First $Top FullName,\n        @{ Name = \"MB\"; Expression = { [math]::Round($_.Length / 1MB, 2) } }",
       "created": "2026-10-08T22:15:09+01:00",
-      "updated": "2026-10-08T22:15:09+01:00",
+      "updated": "2026-10-08T22:47:09+01:00",
       "slug": "find-the-largest-files"
     }
   ]
