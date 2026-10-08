@@ -1,4 +1,4 @@
-# Snippets
+# Snippets Pro
 
 **3 snippets** across **3 languages** - last updated **2026-10-08**.
 
