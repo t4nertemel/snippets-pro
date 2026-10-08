@@ -1,9 +1,12 @@
 # Snippets Pro
 
-**3 snippets** across **3 categories** and **3 languages** - last updated **2026-10-08**.
+**4 snippets** across **4 categories** and **4 languages** - last updated **2026-10-08**.
 
 ## Table of contents
 
+- **[CSS](#css)** (1)
+  - [CSS](#css-1) (1)
+    - [Hover alt colour](#hover-alt-colour)
 - **[Filesystem](#filesystem)** (1)
   - [PowerShell](#powershell) (1)
     - [Find the largest files](#find-the-largest-files)
@@ -13,6 +16,23 @@
 - **[Web UI](#web-ui)** (1)
   - [JavaScript](#javascript) (1)
     - [Debounce (browser)](#debounce-browser)
+
+## CSS
+
+### CSS
+
+#### Hover alt colour
+
+Add hover alt colour
+
+[`#wordpress`](#wordpress) [`#css`](#css-2) · updated 2026-10-08 · 4 lines
+
+```css
+/* Hover alt colour */
+.altcolour a:hover {
+	color: #efcc0b;
+}
+```
 
 ## Filesystem
 
@@ -113,6 +133,10 @@ window.addEventListener("resize", onResize);
 
 - [Debounce (browser)](#debounce-browser)
 
+### #css
+
+- [Hover alt colour](#hover-alt-colour)
+
 ### #filesystem
 
 - [Find the largest files](#find-the-largest-files)
@@ -140,6 +164,10 @@ window.addEventListener("resize", onResize);
 ### #windows
 
 - [Find the largest files](#find-the-largest-files)
+
+### #wordpress
+
+- [Hover alt colour](#hover-alt-colour)
 
 ## Usage
 

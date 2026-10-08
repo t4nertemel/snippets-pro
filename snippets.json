@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "title": "Snippets Pro",
-  "updated": "2026-10-08T22:47:44+01:00",
+  "updated": "2026-10-08T22:56:37+01:00",
   "snippets": [
     {
       "id": 1,
@@ -50,6 +50,21 @@
       "created": "2026-10-08T22:15:09+01:00",
       "updated": "2026-10-08T22:47:09+01:00",
       "slug": "find-the-largest-files"
+    },
+    {
+      "id": 4,
+      "slug": "hover-alt-colour",
+      "title": "Hover alt colour",
+      "category": "CSS",
+      "language": "css",
+      "description": "Add hover alt colour",
+      "tags": [
+        "wordpress",
+        "css"
+      ],
+      "code": "/* Hover alt colour */\n.altcolour a:hover {\n\tcolor: #efcc0b;\n}",
+      "created": "2026-10-08T22:56:37+01:00",
+      "updated": "2026-10-08T22:56:37+01:00"
     }
   ]
 }
