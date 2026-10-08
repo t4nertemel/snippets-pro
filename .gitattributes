@@ -1,0 +1,12 @@
+# snippet_cli.py rewrites snippets.json and README.md on every change.
+# Forcing LF keeps those regenerated files byte-stable on every OS and
+# removes "whole file changed" noise from diffs.
+* text=auto eol=lf
+
+# Binary assets (if you ever add screenshots to the README)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

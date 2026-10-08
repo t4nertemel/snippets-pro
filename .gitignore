@@ -1,0 +1,27 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- Editors / OS ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Scratch files ---
+*.tmp
+*.bak
+scratch.*
+
+# NOTE: snippets.json and README.md are the repository data.
+# They are generated/updated by snippet_cli.py and MUST be committed.

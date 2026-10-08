@@ -1,0 +1,23 @@
+name: README is up to date
+
+# Guard rail: snippets.json is the source of truth, README.md is generated.
+# If a push edits the database without rebuilding the README (for example when
+# a snippet is added by hand on GitHub's web editor), this job fails and you
+# know to run `python snippet_cli.py build` locally.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify that README.md matches snippets.json
+        run: python snippet_cli.py build --check
