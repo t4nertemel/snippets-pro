@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "title": "Snippets Pro",
-  "updated": "2026-10-08T22:56:37+01:00",
+  "updated": "2026-10-09T12:12:28+01:00",
   "snippets": [
     {
       "id": 1,
@@ -53,7 +53,6 @@
     },
     {
       "id": 4,
-      "slug": "hover-alt-colour",
       "title": "Hover alt colour",
       "category": "CSS",
       "language": "css",
@@ -64,7 +63,39 @@
       ],
       "code": "/* Hover alt colour */\n.altcolour a:hover {\n\tcolor: #efcc0b;\n}",
       "created": "2026-10-08T22:56:37+01:00",
-      "updated": "2026-10-08T22:56:37+01:00"
+      "updated": "2026-10-08T22:56:37+01:00",
+      "slug": "hover-alt-colour"
+    },
+    {
+      "id": 5,
+      "title": "Reverse column order",
+      "category": "Mobile view",
+      "language": "css",
+      "description": "Reverse order columns on mobile device",
+      "tags": [
+        "css",
+        "responsive"
+      ],
+      "code": "/* Reverse order columns on mobile device */\n@media (max-width: 768px) {\n    .row-reverse-mobile {\n        display: flex;\n        flex-direction: column-reverse;\n    }\n}",
+      "created": "2026-10-09T08:29:08+01:00",
+      "updated": "2026-10-09T08:29:08+01:00",
+      "slug": "reverse-column-order"
+    },
+    {
+      "id": 6,
+      "slug": "blur-images-inside-gutenberg-block",
+      "title": "Blur images inside Gutenberg block",
+      "category": "WordPress, Gutenberg",
+      "language": "css",
+      "description": "Blur all images inside Gutenberg blocks",
+      "tags": [
+        "wordpress",
+        "gutenberg",
+        "blockeditor"
+      ],
+      "code": "/* Blur all images inside Gutenberg blocks */\n.entry-content img, .epkb-cat-icon.epkb-cat-icon--image, \n.wp-block img {\n  filter: blur(3px);\n}",
+      "created": "2026-10-09T12:12:28+01:00",
+      "updated": "2026-10-09T12:12:28+01:00"
     }
   ]
 }
